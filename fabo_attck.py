@@ -84,7 +84,7 @@ def print_banner():
 {Colors.NEON}          ULTIMATE v{VERSION} - REAL ATTACK{Colors.WHITE}
 {Colors.CYAN}    Professional Facebook Security Testing{Colors.WHITE}
 {Colors.YELLOW}    Author: {AUTHOR} | {LICENSE}{Colors.WHITE}
-{Colors.MAGENTA}    ⚡ 100% REAL - ZERO SIMULATION ⚡{Colors.WHITE}
+
     """
     print(banner)
     print("=" * 80)
